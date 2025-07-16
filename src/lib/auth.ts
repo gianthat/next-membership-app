@@ -1,17 +1,21 @@
 // src/lib/auth.ts
+
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import { compare } from "bcryptjs";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
-import { AuthOptions } from "next-auth";
+import { type NextAuthOptions } from "next-auth";
+import { prisma } from "@/lib/prisma";
 
-export const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
+      authorization: {
+        params: { scope: "read:user user:email" },
+      },
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -31,8 +35,7 @@ export const authOptions: AuthOptions = {
           user.hashedPassword
         );
 
-        if (!isValid) return null;
-        return user;
+        return isValid ? user : null;
       },
     }),
   ],
@@ -54,10 +57,11 @@ export const authOptions: AuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token?.role) {
-        session.user.role = token.role as string;
-      }
+      if (session.user) session.user.role = token.role as string;
       return session;
+    },
+    async redirect({ baseUrl }) {
+      return `${baseUrl}/dashboard`;
     },
   },
   pages: {
