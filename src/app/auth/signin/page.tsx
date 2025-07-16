@@ -1,27 +1,14 @@
 'use client';
 
-import { getProviders, signIn, LiteralUnion, ClientSafeProvider } from "next-auth/react";
+import { getProviders, signIn, type ClientSafeProvider } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { BuiltInProviderType } from "next-auth/providers";
 
 export default function SignInPage() {
-  const [providers, setProviders] = useState<Record<LiteralUnion<BuiltInProviderType, string>, ClientSafeProvider> | null>(null);
+  const [providers, setProviders] = useState<Record<string, ClientSafeProvider> | null>(null);
 
   useEffect(() => {
     getProviders().then(setProviders);
   }, []);
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value;
-    const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
-
-    signIn("credentials", {
-      email,
-      password,
-      callbackUrl: "/dashboard"
-    });
-  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -29,7 +16,19 @@ export default function SignInPage() {
         <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">Sign in</h2>
 
         {/* Credentials Sign-in Form */}
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form
+          className="space-y-4"
+          onSubmit={e => {
+            e.preventDefault();
+            const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value;
+            const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
+            signIn("credentials", {
+              email,
+              password,
+              callbackUrl: "/dashboard"
+            });
+          }}
+        >
           <div>
             <label className="block text-sm font-medium text-gray-800">Email</label>
             <input
@@ -61,7 +60,7 @@ export default function SignInPage() {
         {/* Divider */}
         <div className="my-6 border-t text-center text-gray-500 text-sm">or</div>
 
-        {/* OAuth Providers */}
+        {/* Other Providers */}
         {providers &&
           Object.values(providers).map(provider =>
             provider.id !== "credentials" ? (

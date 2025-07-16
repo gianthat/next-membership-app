@@ -1,13 +1,10 @@
-// src/lib/authOptions.ts
-
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
+import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { NextAuthOptions } from "next-auth";
+import { compare } from "bcryptjs";
 
-// Assign 'member' role if user has no role yet
 async function setDefaultRole(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (user && !user.role) {
@@ -35,27 +32,17 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({
           where: { email: credentials?.email },
         });
-
         if (!user || !user.hashedPassword) return null;
 
-        const isValid = await compare(
-          credentials!.password,
-          user.hashedPassword
-        );
-
-        if (!isValid) return null;
-        return user;
+        const isValid = await compare(credentials!.password, user.hashedPassword);
+        return isValid ? user : null;
       },
     }),
   ],
-  session: {
-    strategy: "database",
-  },
+  session: { strategy: "database" },
   callbacks: {
     async signIn({ user }) {
-      if (user) {
-        await setDefaultRole(user.id);
-      }
+      if (user) await setDefaultRole(user.id);
       return true;
     },
     async jwt({ token, user }) {
@@ -63,9 +50,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token?.role) {
-        session.user.role = token.role;
-      }
+      if (session.user && token?.role) session.user.role = token.role;
       return session;
     },
     async redirect({ baseUrl }) {
