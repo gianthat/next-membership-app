@@ -1,5 +1,4 @@
 // src/lib/auth.ts
-
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import GitHubProvider from "next-auth/providers/github";
@@ -13,9 +12,6 @@ export const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
-      authorization: {
-        params: { scope: "read:user user:email" },
-      },
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -27,14 +23,8 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({
           where: { email: credentials?.email },
         });
-
         if (!user || !user.hashedPassword) return null;
-
-        const isValid = await compare(
-          credentials!.password,
-          user.hashedPassword
-        );
-
+        const isValid = await compare(credentials.password!, user.hashedPassword);
         return isValid ? user : null;
       },
     }),
