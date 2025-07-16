@@ -1,10 +1,19 @@
-// src/lib/auth.ts
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { type NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
+
+async function setDefaultRole(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user && !user.role) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "member" },
+    });
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -19,34 +28,24 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-async authorize(credentials) {
-  if (!credentials?.email || !credentials.password) {
-    return null;
-  }
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { email: credentials.email },
-  });
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
 
-  if (!user || !user.hashedPassword) return null;
+        if (!user || !user.hashedPassword) return null;
 
-  const isValid = await compare(credentials.password, user.hashedPassword);
-  return isValid ? user : null;
-},
-
+        const isValid = await compare(credentials.password, user.hashedPassword);
+        return isValid ? user : null;
+      },
     }),
   ],
-  session: {
-    strategy: "database",
-  },
+  session: { strategy: "database" },
   callbacks: {
     async signIn({ user }) {
-      if (user && !user.role) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { role: "member" },
-        });
-      }
+      if (user) await setDefaultRole(user.id);
       return true;
     },
     async jwt({ token, user }) {
@@ -54,7 +53,9 @@ async authorize(credentials) {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) session.user.role = token.role as string;
+      if (session.user && token?.role) {
+        session.user.role = token.role as string;
+      }
       return session;
     },
     async redirect({ baseUrl }) {
