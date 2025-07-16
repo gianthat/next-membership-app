@@ -1,9 +1,23 @@
+// app/api/auth/[...nextauth]/route.ts
+
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-// ✅ Export this so getServerSession() can use it
+// Assign 'member' role if user has no role yet
+async function setDefaultRole(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user && !user.role) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "member" },
+    });
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -11,27 +25,62 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
       authorization: {
-        params: {
-          scope: "read:user user:email",
-        },
+        params: { scope: "read:user user:email" },
+      },
+    }),
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const user = await prisma.user.findUnique({
+          where: { email: credentials?.email },
+        });
+
+        if (!user || !user.hashedPassword) return null;
+
+        const isValid = await compare(
+          credentials!.password,
+          user.hashedPassword
+        );
+
+        if (!isValid) return null;
+        return user;
       },
     }),
   ],
   session: {
-    strategy: "database", // or "jwt" if you prefer
+    strategy: "database",
   },
   callbacks: {
-    async signIn({ profile }) {
-      console.log("🔥 GitHub profile:", profile);
+    async signIn({ user }) {
+      if (user) {
+        await setDefaultRole(user.id);
+      }
       return true;
     },
-    async redirect({ url, baseUrl }) {
-      return `${baseUrl}/dashboard`; // 👈 Always go to /dashboard
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+      }
+      return token;
     },
+    async session({ session, token }) {
+      if (session.user && token?.role) {
+        session.user.role = token.role;
+      }
+      return session;
+    },
+    async redirect({ baseUrl }) {
+      return `${baseUrl}/dashboard`;
+    },
+  },
+  pages: {
+    signIn: "/auth/signin",
   },
 };
 
-// ✅ Pass the options to NextAuth
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST };

@@ -13,6 +13,8 @@ model User {
   name          String?
   image         String?
   emailVerified DateTime?  // 👈 Add this line
+  role          String   @default("member") // 👈 Add this line
+  hashedPassword      String? // If you're using credentials auth
   accounts      Account[]
   sessions      Session[]
   lists         List[]
