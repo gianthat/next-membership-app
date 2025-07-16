@@ -2,18 +2,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { type NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
-
-async function setDefaultRole(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (user && !user.role) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: "member" },
-    });
-  }
-}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -45,7 +35,12 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "database" },
   callbacks: {
     async signIn({ user }) {
-      if (user) await setDefaultRole(user.id);
+      if (user && !user.role) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { role: "member" },
+        });
+      }
       return true;
     },
     async jwt({ token, user }) {
@@ -53,9 +48,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token?.role) {
-        session.user.role = token.role as string;
-      }
+      if (session.user) session.user.role = token.role as string;
       return session;
     },
     async redirect({ baseUrl }) {
