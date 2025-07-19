@@ -38,9 +38,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       if (user && !user.role) {
-        await prisma.user.update({
+        await prisma.user.upsert({
           where: { id: user.id },
           data: { role: "member" },
+          create: {
+            id: user.id,
+            email: user.email!,
+            role: "member",
+            name: user.name,
+            image: user.image,
+          },
         });
       }
       return true;
