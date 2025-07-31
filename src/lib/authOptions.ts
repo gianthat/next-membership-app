@@ -23,6 +23,16 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: "database" },
   callbacks: {
+    async signIn({ user }) {
+      // DB test inside signIn to confirm connectivity during auth
+      try {
+        const result = await prisma.$queryRaw<{ now: Date }[]>`SELECT NOW()`;
+        console.log("✅ DB test in signIn:", result);
+      } catch (err) {
+        console.error("❌ DB test failed in signIn:", err);
+      }
+      return true;
+    },
     async redirect({ baseUrl }) {
       return `${baseUrl}/dashboard`;
     },
