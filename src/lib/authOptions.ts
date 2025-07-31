@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
 
         let email = profile.email;
 
-        // Fetch email from GitHub API if missing
+        // If GitHub doesn't return email, fetch it from the authenticated API
         if (!email && tokens?.access_token) {
           try {
             const res = await fetch("https://api.github.com/user/emails", {
@@ -31,8 +31,11 @@ export const authOptions: NextAuthOptions = {
                 Accept: "application/vnd.github+json",
               },
             });
+
             if (res.ok) {
               const emails: GitHubEmail[] = await res.json();
+              console.log("Fetched emails from GitHub API:", emails);
+
               const primaryEmail = emails.find(
                 (e) => e.primary && e.verified
               );
@@ -45,9 +48,9 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        // Fallback if still no email
+        // Last resort — generate a placeholder email so Prisma won't fail
         if (!email) {
-          email = `${profile.login}@noemail.local`;
+          email = `${profile.login}@users.noreply.github.com`;
         }
 
         return {
@@ -62,11 +65,7 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "database" },
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log("🔍 signIn callback data:", {
-        user,
-        account,
-        profile,
-      });
+      console.log("🔍 signIn callback data:", { user, account, profile });
       return true;
     },
     async redirect({ baseUrl }) {
