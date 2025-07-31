@@ -3,6 +3,13 @@ import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
+type GitHubEmail = {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+  visibility: string | null;
+};
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -25,9 +32,9 @@ export const authOptions: NextAuthOptions = {
               },
             });
             if (res.ok) {
-              const emails = await res.json();
+              const emails: GitHubEmail[] = await res.json();
               const primaryEmail = emails.find(
-                (e: any) => e.primary && e.verified
+                (e) => e.primary && e.verified
               );
               if (primaryEmail) {
                 email = primaryEmail.email;
@@ -54,6 +61,14 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: "database" },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      console.log("🔍 signIn callback data:", {
+        user,
+        account,
+        profile,
+      });
+      return true;
+    },
     async redirect({ baseUrl }) {
       return `${baseUrl}/dashboard`;
     },
